@@ -1,0 +1,21 @@
+<!doctype html><meta charset="utf-8"><script type="module">
+import { AudioEngine } from './audio.js';
+window.renderSfx = async (name, secs = 3) => {
+  const ctx = new OfflineAudioContext(2, 44100 * secs, 44100);
+  const e = new AudioEngine(); e.enabled = true; e.attach(ctx);
+  e[name]();
+  const buf = await ctx.startRendering();
+  const L = buf.getChannelData(0), R = buf.getChannelData(1);
+  let peak = 0, sum = 0, last = 0;
+  for (let i = 0; i < L.length; i++) { const v = Math.max(Math.abs(L[i]), Math.abs(R[i])); peak = Math.max(peak, v); sum += L[i] * L[i]; if (v > 0.003) last = i; }
+  // 16-bit wav
+  const n = L.length, ab = new ArrayBuffer(44 + n * 4), dv = new DataView(ab);
+  const w = (o, s) => [...s].forEach((c, i) => dv.setUint8(o + i, c.charCodeAt(0)));
+  w(0, 'RIFF'); dv.setUint32(4, 36 + n * 4, true); w(8, 'WAVEfmt '); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 2, true);
+  dv.setUint32(24, 44100, true); dv.setUint32(28, 44100 * 4, true); dv.setUint16(32, 4, true); dv.setUint16(34, 16, true); w(36, 'data'); dv.setUint32(40, n * 4, true);
+  for (let i = 0; i < n; i++) { dv.setInt16(44 + i * 4, Math.max(-1, Math.min(1, L[i])) * 32767, true); dv.setInt16(46 + i * 4, Math.max(-1, Math.min(1, R[i])) * 32767, true); }
+  let bin = ''; const u8 = new Uint8Array(ab); for (let i = 0; i < u8.length; i += 0x8000) bin += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
+  return { peak, rms: Math.sqrt(sum / n), len: last / 44100, wav: btoa(bin) };
+};
+window.ready = true;
+</script>

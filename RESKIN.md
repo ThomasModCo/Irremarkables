@@ -107,3 +107,15 @@ Also run `python3 pipeline/strip_avif.py dist/assets`. three's GLTFLoader embeds
   - `dustRing`: take-off, landing, cryo frost.
 - **Phones:** particle size now scales with the device pixel ratio, so effects are the same size on screen on high-DPI phones. Size is capped at 20% of screen height, so nothing fills the view when it bursts right in front of the camera.
 - **Review tool:** `pipeline/fxlab.cjs <url> <outprefix> [names]` triggers each effect from a fixed spot and freezes the frame for screenshots. `fxgrid.py` tiles the shots into a contact sheet. `build.sh` runs the Vite build plus the artifact-safe post steps.
+
+## 80s cartoon sound pass (`src/audio.js`)
+- **Style:** every sound is still synthesised in code (no audio files), redesigned after 80s Saturday-morning superhero cartoons:
+  - punch foley with a crack and a whap;
+  - timpani and crash-cymbal hits;
+  - brass stabs: a power chord on landing, "dun dun DUNNN" for the nemesis, a "ta-da" on cash out, a sad trombone on elimination;
+  - analog synth zaps and sweeps, a theremin for telekinesis, slide whistles and spring boings.
+- **Mix:** all sounds go through a lightly saturated bus, a glue compressor and a synthesised spring reverb.
+- **Building blocks:** `thump`, `timp`, `crash`, `brass`, `bell` (FM), `boing`, `slide`, plus the `osc` and `noise` voices. The public `SFX.*` API is unchanged.
+- **Variation:** frequent sounds (punch, kill, whoosh, coin) vary their pitch randomly on every play and are rate-limited, so a brawl doesn't turn into noise.
+- **Levels:** per-event loudness trims live in `VOL` at the top of the file.
+- **Offline rendering:** `AudioEngine.attach(ctx)` also accepts an `OfflineAudioContext`. `pipeline/sfxrender.cjs` uses it to render every sound to WAV and report its peak, RMS and length.

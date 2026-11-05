@@ -89,6 +89,11 @@ export class Character {
     );
     this.aura.rotation.x = -Math.PI / 2;
     this.aura.position.y = 0.07;
+    // comic ink edge around the power ring
+    this.aura.add(new THREE.Mesh(
+      new THREE.RingGeometry(0.85, 0.91, 28),
+      new THREE.MeshBasicMaterial({ color: 0x14121c, transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide })
+    ));
     this.group.add(this.aura);
 
     this.blobShadow = new THREE.Mesh(
@@ -99,10 +104,17 @@ export class Character {
     this.blobShadow.position.y = 0.04;
     this.group.add(this.blobShadow);
 
+    // faceted ice crystal with inked edges (cel look) instead of a box
+    const iceGeo = new THREE.IcosahedronGeometry(1, 0);
+    iceGeo.scale(0.72, 1.38, 0.62);
     this.iceShell = new THREE.Mesh(
-      new THREE.BoxGeometry(1.15, 2.45, 0.95),
-      new THREE.MeshLambertMaterial({ color: 0x9df2ff, transparent: true, opacity: 0.55 })
+      iceGeo,
+      new THREE.MeshLambertMaterial({ color: 0x9df2ff, transparent: true, opacity: 0.6, flatShading: true })
     );
+    this.iceShell.add(new THREE.LineSegments(
+      new THREE.EdgesGeometry(iceGeo),
+      new THREE.LineBasicMaterial({ color: 0x1a3d66, transparent: true, opacity: 0.9 })
+    ));
     this.iceShell.position.y = 1.22;
     this.iceShell.visible = false;
     this.group.add(this.iceShell);
@@ -158,6 +170,15 @@ export class Character {
       this.body = null;
     }
     if (this.cape) { this.cape.dispose(); this.cape = null; }
+  }
+
+  // rebuild the body with the same palette (used when a modelled hero
+  // finishes streaming in while this character is already on screen)
+  refreshLook() {
+    if (!this.arch || !this.body) return;
+    const lookId = this.disguise || this.power?.id;
+    this.buildLook(lookId, this.palette);
+    if (this.propMesh) { this.body.visible = false; if (this.cape) this.cape.visible = false; }
   }
 
   setPower(power) {
@@ -232,6 +253,7 @@ export class Character {
     }
     this.cape?.setOpacity(alpha);
     this.aura.material.opacity = 0.55 * alpha;
+    if (this.aura.children[0]) this.aura.children[0].material.opacity = 0.55 * alpha;   // never give away an invisible hero
     if (this.label) this.label.material.opacity = alpha < 1 ? alpha * 0.4 : 1;
   }
 

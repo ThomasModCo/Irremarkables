@@ -1,6 +1,6 @@
 import { CONFIG } from './config.js';
 import { POWERS } from './powers.js';
-import { powerIcon, LOCK_ICON } from './icons.js';
+import { buffIcon, powerIcon, LOCK_ICON } from './icons.js';
 import { formatMoney } from './utils.js';
 import { SFX } from './audio.js';
 
@@ -162,7 +162,7 @@ export class UI {
 
   setBuffs(buffs) {
     $('buff-row').innerHTML = buffs
-      .map((b) => `<span class="buff-chip">${b.icon ? powerIcon(b.icon) : b.emblem} ${b.label}</span>`)
+      .map((b) => `<span class="buff-chip">${b.icon ? powerIcon(b.icon) : b.buff ? buffIcon(b.buff) : b.emblem} ${b.label}</span>`)
       .join('');
   }
 
@@ -192,10 +192,11 @@ export class UI {
     setTimeout(() => el.remove(), 1000);
   }
 
-  announce(text, { danger = false, dur = 2200, icon = null } = {}) {
+  announce(text, { danger = false, dur = 2200, icon = null, buff = null } = {}) {
     const el = $('announce');
     el.textContent = text;
     if (icon) el.innerHTML = powerIcon(icon) + '<span>' + el.innerHTML + '</span>';
+    else if (buff) el.innerHTML = buffIcon(buff) + '<span>' + el.innerHTML + '</span>';
     el.classList.remove('hidden');
     el.classList.toggle('danger', danger);
     clearTimeout(this.announceTimer);

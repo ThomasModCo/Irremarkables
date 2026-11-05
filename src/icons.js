@@ -95,3 +95,46 @@ export const LOCK_ICON = `<svg class="picon lock" viewBox="0 0 64 64" width="1em
   `<path d="M20 30 V22 C20 14 26 9 32 9 C38 9 44 14 44 22 V30" fill="none" stroke="#e9e6ef" stroke-width="7" stroke-linecap="round"/>` +
   `<rect x="13" y="28" width="38" height="30" rx="6" fill="#e9e6ef" stroke="#141018" stroke-width="3.5"/>` +
   `<circle cx="32" cy="42" r="4.5" fill="#141018"/><path d="M32 44 V51" stroke="#141018" stroke-width="4" stroke-linecap="round"/></svg>`;
+
+// ---- buff / pickup icons (replace the emoji the HUD chips used) ----
+const BUFFS = {
+  // DNA helix: Power Absorption
+  absorb: [0x3ddc97, (c, l) => `
+    <path d="M20 6 C20 22 44 26 44 42 C44 50 38 56 32 58" fill="none" stroke="${c}" stroke-width="7" stroke-linecap="round"/>
+    <path d="M44 6 C44 22 20 26 20 42 C20 50 26 56 32 58" fill="none" stroke="${l}" stroke-width="7" stroke-linecap="round"/>
+    <path d="M23 14 H41 M26 22 H38 M26 42 H38 M23 50 H41" stroke="${INK}" stroke-width="3" stroke-linecap="round"/>`],
+  // two linked orbs: Two Powers
+  twopower: [0xc07bff, (c, l) => `
+    <circle cx="23" cy="34" r="15" fill="${c}"/>
+    <circle cx="41" cy="30" r="15" fill="${l}"/>
+    <path d="M30 22 C36 26 36 38 30 44" fill="none" stroke="${INK}" stroke-width="3"/>
+    <circle cx="20" cy="30" r="3" fill="#fff" stroke="none"/><circle cx="44" cy="26" r="3" fill="#fff" stroke="none"/>`],
+  // circular arrows: Extra Switch
+  extraswitch: [0x6ea8ff, (c, l) => `
+    <path d="M14 30 C14 18 24 10 34 10 C42 10 48 14 52 20" fill="none" stroke="${c}" stroke-width="8" stroke-linecap="round"/>
+    <path d="M44 22 L56 24 L54 10 Z" fill="${c}"/>
+    <path d="M50 34 C50 46 40 54 30 54 C22 54 16 50 12 44" fill="none" stroke="${l}" stroke-width="8" stroke-linecap="round"/>
+    <path d="M20 42 L8 40 L10 54 Z" fill="${l}"/>`],
+  // figure with up arrows: Enlarge
+  enlarge: [0xff8c42, (c, l) => `
+    <circle cx="32" cy="18" r="8" fill="${l}"/>
+    <path d="M20 58 L22 34 C22 28 42 28 42 34 L44 58 Z" fill="${c}"/>
+    <path d="M8 26 L14 16 L20 26 M44 26 L50 16 L56 26" fill="none" stroke="${c}" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>`],
+  // comet: Fireball
+  fireball: [0xff4040, (c, l) => `
+    <path d="M8 56 C14 40 22 30 34 24 C30 32 30 36 32 40 C38 34 44 32 52 30 C46 40 40 50 26 54 Z" fill="${l}"/>
+    <circle cx="40" cy="22" r="14" fill="${c}"/>
+    <circle cx="36" cy="18" r="4" fill="#fff" stroke="none"/>`],
+  // impact burst: Superhero Landing
+  landing: [0xffd166, (c, l) => `
+    <path d="M32 4 L38 22 L56 16 L44 32 L58 44 L40 44 L36 60 L28 46 L12 54 L18 38 L4 28 L22 24 Z" fill="${c}"/>
+    <path d="M32 20 L35 28 L43 27 L37 33 L41 41 L33 37 L27 42 L28 34 L21 30 L29 28 Z" fill="${l}"/>`],
+};
+export function buffIcon(id, size = '1em') {
+  const b = BUFFS[id];
+  if (!b) return '';
+  const key = 'buff:' + id;
+  const body = cache[key] || (cache[key] = b[1](hex(b[0]), lighten(b[0])));
+  return `<svg class="picon" viewBox="0 0 64 64" width="${size}" height="${size}" role="img" aria-label="${id}">` +
+    `<g stroke="${INK}" stroke-width="3.5" stroke-linejoin="round" paint-order="stroke">${body}</g></svg>`;
+}

@@ -1,12 +1,24 @@
 import * as THREE from 'three';
 import { CONFIG } from './config.js';
 import { rand, weightedPick } from './utils.js';
+import { AUTHORED, makeAuthoredProp } from './authored.js';
 
 export const PILL_COLORS = { absorb: 0x3ddc97, twopower: 0xc07bff, extraswitch: 0x6ea8ff };
 export const POTION_COLORS = { enlarge: 0xff8c42, fireball: 0xff4040, landing: 0xffd166 };
 
+// pickups glow a little so they read against the cel-shaded street
+function glowUp(mesh, color, k) {
+  mesh.material.emissive = new THREE.Color(color).multiplyScalar(k);
+  return mesh;
+}
+
 export function makePillMesh(color) {
   const g = new THREE.Group();
+  if (AUTHORED.props.pill) {
+    g.add(glowUp(makeAuthoredProp('pill', color), color, 0.25));
+    g.rotation.z = Math.PI / 5;
+    return g;
+  }
   const mat = new THREE.MeshLambertMaterial({ color, emissive: color, emissiveIntensity: 0.5 });
   const white = new THREE.MeshLambertMaterial({ color: 0xf2f4f8, emissive: 0xf2f4f8, emissiveIntensity: 0.25 });
   const half1 = new THREE.Mesh(new THREE.CapsuleGeometry(0.22, 0.3, 4, 10), mat);
@@ -19,6 +31,12 @@ export function makePillMesh(color) {
 
 export function makePotionMesh(color) {
   const g = new THREE.Group();
+  if (AUTHORED.props.potion) {
+    const m = glowUp(makeAuthoredProp('potion', color), color, 0.25);
+    m.position.y = -0.45;   // model sits on its base; centre it on the bob height
+    g.add(m);
+    return g;
+  }
   const glass = new THREE.MeshLambertMaterial({ color, emissive: color, emissiveIntensity: 0.55, transparent: true, opacity: 0.9 });
   const body = new THREE.Mesh(new THREE.SphereGeometry(0.32, 12, 10), glass);
   body.scale.y = 1.15;
@@ -33,6 +51,14 @@ export function makePotionMesh(color) {
 
 // the spinning coin every idle token is drawn with
 export function makeTokenParts() {
+  if (AUTHORED.props.token) {
+    const m = makeAuthoredProp('token');
+    const geo = m.geometry.clone();
+    geo.computeBoundingBox();
+    const c = geo.boundingBox.getCenter(new THREE.Vector3());
+    geo.translate(-c.x, -c.y, -c.z);   // spin around its own centre
+    return { geo, mat: glowUp(m, 0xffc94a, 0.18).material };
+  }
   const geo = new THREE.CylinderGeometry(0.34, 0.34, 0.09, 14);
   geo.rotateX(Math.PI / 2);
   const mat = new THREE.MeshLambertMaterial({ color: 0xffd166, emissive: 0xaa7a1e, emissiveIntensity: 0.6 });

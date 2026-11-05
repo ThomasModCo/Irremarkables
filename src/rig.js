@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { SUITS } from './archetypes.js';
 import { ANIM } from './animlib.js';
+import { AUTHORED, buildAuthoredRig } from './authored.js';
 
 const TAU = Math.PI * 2;
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
@@ -171,6 +172,9 @@ function frameFor(axis) {
 // rig construction
 // ---------------------------------------------------------------------------
 export function buildRig(arch, P, { faceless = false } = {}) {
+  // modelled replacement (reskin) takes over when one is loaded
+  const authored = AUTHORED.heroes[arch.suit];
+  if (authored) return buildAuthoredRig(arch, P, authored);
   const b = arch.build;
   const mass = b.mass, def = b.definition;
   const H = ANIM.unitHeight;      // Mixamo units; all proportions are fractions of body height

@@ -7,6 +7,19 @@ import { RUNTIME } from './utils.js';
 const STEP = 1 / 60;
 const GRAV = -9.8;
 
+// Feel of the cape. Lower = calmer. The cape must never flip over the head:
+// it is kept behind the back plane at every height, and each row may swing
+// at most MAX_SWING of the way from "hanging along the spine" to "straight up".
+const CAPE = {
+  damping: 0.92,      // velocity kept per step (was 0.97)
+  trail: 0.45,        // how strongly it trails the wearer's motion (was 0.9)
+  flutter: 0.6,       // random wind (was 2.5)
+  maxStep: 0.2,       // per-step speed cap, x scale (was 0.35)
+  bend: 0.55,         // bend resistance (was 0.25)
+  iterations: 4,      // constraint passes (was 3)
+  maxSwing: 0.65,     // 0 = always hangs straight, 1 = may lift to horizontal-ish
+};
+
 export class Cape {
   constructor(scene, { rows, cols, width, length, color }) {
     this.scene = scene;
@@ -66,7 +79,7 @@ export class Cape {
           this.cons.push([i, i + cols + 1, dg, 0.6]);
           this.cons.push([i + 1, i + cols, dg, 0.6]);
         }
-        if (r < rows - 2) this.cons.push([i, i + cols * 2, dy * 2, 0.25]);   // bend resistance
+        if (r < rows - 2) this.cons.push([i, i + cols * 2, dy * 2, CAPE.bend]);   // bend resistance
       }
     }
   }
@@ -113,9 +126,9 @@ export class Cape {
     const { rows, cols, pos, prev } = this;
     const h2 = STEP * STEP;
     // wind: the cape trails motion, plus a little flutter
-    const wx = -vel.x * 0.9 + (Math.random() - 0.5) * 2.5;
-    const wz = -vel.z * 0.9 + (Math.random() - 0.5) * 2.5;
-    const wy = (Math.random() - 0.5) * 1.5 - Math.hypot(vel.x, vel.z) * 0.15;
+    const wx = -vel.x * CAPE.trail + (Math.random() - 0.5) * CAPE.flutter;
+    const wz = -vel.z * CAPE.trail + (Math.random() - 0.5) * CAPE.flutter;
+    const wy = (Math.random() - 0.5) * CAPE.flutter * 0.6 - Math.hypot(vel.x, vel.z) * 0.1;
 
     // pins
     for (let c = 0; c < cols; c++) {
@@ -127,9 +140,9 @@ export class Cape {
     for (let k = cols; k < this.n; k++) {
       const i = k * 3;
       const x = pos[i], y = pos[i + 1], z = pos[i + 2];
-      let vx = (x - prev[i]) * 0.97, vy = (y - prev[i + 1]) * 0.97, vz = (z - prev[i + 2]) * 0.97;
+      let vx = (x - prev[i]) * CAPE.damping, vy = (y - prev[i + 1]) * CAPE.damping, vz = (z - prev[i + 2]) * CAPE.damping;
       // per-step speed cap keeps the sim stable under any impulse
-      const vm = Math.sqrt(vx * vx + vy * vy + vz * vz), vmax = 0.35 * scale;
+      const vm = Math.sqrt(vx * vx + vy * vy + vz * vz), vmax = CAPE.maxStep * scale;
       if (vm > vmax) { const k = vmax / vm; vx *= k; vy *= k; vz *= k; }
       prev[i] = x; prev[i + 1] = y; prev[i + 2] = z;
       pos[i] = x + vx + wx * h2;
@@ -137,7 +150,11 @@ export class Cape {
       pos[i + 2] = z + vz + wz * h2;
     }
     // constraints
-    for (let it = 0; it < 3; it++) {
+    // centre of the pin line, used to limit how far the cape may swing up
+    let px0 = 0, py0 = 0, pz0 = 0;
+    for (let c = 0; c < cols; c++) { px0 += pins[c].x; py0 += pins[c].y; pz0 += pins[c].z; }
+    body.pin = { x: px0 / cols, y: py0 / cols, z: pz0 / cols };
+    for (let it = 0; it < CAPE.iterations; it++) {
       for (const [a, b, rest, k] of this.cons) {
         const ia = a * 3, ib = b * 3;
         let dx = pos[ib] - pos[ia], dy = pos[ib + 1] - pos[ia + 1], dz = pos[ib + 2] - pos[ia + 2];
@@ -158,7 +175,11 @@ export class Cape {
     const abx = b.x - a.x, aby = b.y - a.y, abz = b.z - a.z;
     const abLen2 = abx * abx + aby * aby + abz * abz || 1e-6;
     const bk = body.back;
-    const yMin = Math.min(a.y, b.y) - 0.15 * scale, yMax = Math.max(a.y, b.y) + 0.12 * scale;
+    // "down the spine" (chest -> hips): the direction a calm cape hangs
+    const abL = Math.sqrt(abLen2);
+    const dnx = abx / abL, dny = aby / abL, dnz = abz / abL;
+    const rowLen = (this.baseLength / (this.rows - 1)) * scale;
+    const pin = body.pin;
     for (let k = cols; k < this.n; k++) {
       const i = k * 3;
       const px = pos[i], py = pos[i + 1], pz = pos[i + 2];
@@ -172,12 +193,24 @@ export class Cape {
         const push = (r - d) / d;
         pos[i] += dx * push; pos[i + 1] += dy * push; pos[i + 2] += dz * push;
       }
-      // back plane: stay behind the torso while alongside it
-      if (py > yMin && py < yMax) {
+      // back plane at EVERY height: the cape can never come round the
+      // shoulders or over the head onto the face
+      {
         const rel = (pos[i] - body.mid.x) * bk.x + (pos[i + 1] - body.mid.y) * bk.y + (pos[i + 2] - body.mid.z) * bk.z;
         const minD = 0.05 * scale;
         if (rel < minD) {
           pos[i] += bk.x * (minD - rel); pos[i + 1] += bk.y * (minD - rel); pos[i + 2] += bk.z * (minD - rel);
+        }
+      }
+      // swing limit: each row must stay a minimum distance "down the spine"
+      // from the pin line, so it can lift and trail but never flip up
+      if (pin) {
+        const row = Math.floor(k / cols);
+        const along = (pos[i] - pin.x) * dnx + (pos[i + 1] - pin.y) * dny + (pos[i + 2] - pin.z) * dnz;
+        const minAlong = row * rowLen * (1 - CAPE.maxSwing);
+        if (along < minAlong) {
+          const f = minAlong - along;
+          pos[i] += dnx * f; pos[i + 1] += dny * f; pos[i + 2] += dnz * f;
         }
       }
       // ground

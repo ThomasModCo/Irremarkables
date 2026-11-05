@@ -167,6 +167,16 @@ export class Game {
       { size: st.size * sizeMul * far, camPos: this.camPos });
   }
 
+  // world sounds fade with distance from the camera (bots brawling across the
+  // map shouldn't drown out your own fight); anything you cause stays full
+  sfxAt(name, x, z, mine = false) {
+    if (mine) { SFX[name](); return; }
+    const d = Math.hypot(x - this.camPos.x, z - this.camPos.z);
+    if (d > 38) return;
+    const k = 1 - d / 38;
+    SFX.play(name, k * k * 0.8);
+  }
+
   // ---- shared comic VFX recipes (fx.js draws them) ----
   // a cel-shaded cloud poof: puffs that swell and pop, plus a couple of sparks
   poof(x, y, z, c1, c2, n = 10) {
@@ -433,7 +443,7 @@ export class Game {
         this.fx.burst(px, py, pz, { color: FXC.ice, size: 2.2 });
         this.fx.ring(px, pz, { color: FXC.ice, maxR: 4.5, dur: 0.5 });
         this.fx.addShake(0.25);
-        SFX.shatter();
+        this.sfxAt('shatter', px, pz, byPlayer);
       }
       else if (cause === 'fire') {
         this.fx.emit(px, py, pz, { count: 16, shape: 'flame', color: FXC.fireHot, color2: FXC.fireDeep, speed: 5, life: 0.6, size: 2.2, gravity: 5 });
@@ -442,14 +452,14 @@ export class Game {
         this.fx.emit(px, 0.4, pz, { count: 12, shape: 'puff', color: FXC.dust, color2: FXC.dustDeep, speed: 6, life: 0.7, size: 2.0, gravity: 0, drag: 3.5, spread: 1.3 });
         this.fx.emit(px, py, pz, { count: 10, shape: 'spark', color: FXC.tk, color2: FXC.tkDeep, speed: 8, life: 0.5, size: 1.3 });
         this.fx.burst(px, py, pz, { color: FXC.tk, size: 2.4 });
-        SFX.slam();
+        this.sfxAt('slam', px, pz, byPlayer);
       } else {
         this.fx.emit(px, py, pz, { count: 14, shape: 'spark', color: col, color2: deep(col), speed: 8, life: 0.55, size: 1.4, spin: 6 });
         this.fx.emit(px, py, pz, { count: 7, shape: 'puff', color: FXC.white, color2: col, speed: 3, life: 0.6, size: 1.9, gravity: 0.5, drag: 3 });
         this.fx.burst(px, py, pz, { color: col, size: 2.0 });
       }
       this.fx.ring(px, pz, { color: col, maxR: 3, dur: 0.4 });
-      SFX.kill();
+      this.sfxAt('kill', px, pz, byPlayer);
       const word = cause === 'fire' ? 'fire' : cause === 'shatter' ? 'shatter' : cause === 'slam' ? 'slam' : cause === 'squish' ? 'squish' : 'kill';
       this.bam(px, py + 0.4, pz, word, byPlayer ? 1 : 0.8);
     }
@@ -697,7 +707,7 @@ export class Game {
       }
       const hitPlayer = fromBot && this.player?.ch.alive && chestDist(this.player.ch, pr.pos) < 1.8;
       if (pr.life <= 0 || hitWall || hitBot || hitPlayer) {
-        SFX.explosion();
+        this.sfxAt('explosion', pr.pos.x, pr.pos.z, !fromBot);
         this.fx.addShake(0.8);
         this.explosionFx(pr.pos.x, pr.pos.y, pr.pos.z);
         this.bam(pr.pos.x, pr.pos.y + 0.5, pr.pos.z, 'boom', 1.2);

@@ -103,20 +103,24 @@ void main() {
   }
   if (d > 0.0) discard;
 
-  // ink edge: ~1.5 screen px, never thinner than 6% of the shape
-  float ink = max(0.06, 1.6 / vPx);
-  if (d > -ink) { gl_FragColor = vec4(uInk, 1.0); return; }
-
   // cel colour over life: hard steps from colour to colour2, not a blend
   float t = vLife > 0.62 ? 0.0 : (vLife > 0.3 ? 0.5 : 1.0);
   vec3 col = mix(vColor, vColor2, t);
+
+  // thin edge line (~1 screen px) in a dark shade of the particle's own
+  // colour rather than black, so effects read cel-shaded, not stickered;
+  // tiny particles skip it entirely
+  if (vPx > 9.0) {
+    float ink = clamp(1.1 / vPx, 0.014, 0.032);
+    if (d > -ink) { gl_FragColor = vec4(mix(uInk, col * 0.4, 0.6), 1.0); return; }
+  }
 
   // two-tone shading in screen space, light from the top left
   vec2 n = p / 0.5;
   float L = dot(n, normalize(vec2(-0.55, 0.75)));
   if (shape == 2) {                             // puffs: shadow crescent + rim highlight
     if (L < -0.12) col *= 0.72;
-    else if (L > 0.55 && d < -ink * 2.0) col = mix(col, vec3(1.0), 0.35);
+    else if (L > 0.55 && d < -0.05) col = mix(col, vec3(1.0), 0.35);
   } else if (shape == 3) {                      // flames: hot core
     if (d < -0.13) col = mix(col, vec3(1.0, 0.97, 0.8), 0.75);
   } else if (shape == 4) {                      // shards: lit facet
@@ -148,9 +152,9 @@ void main() {
   float inner = mix(0.8, 0.995, uK);
   if (r > outer || r < inner) discard;
   // ink width in ring units: ~5 cm on the ground at any radius
-  float ink = clamp(0.06 / uScale, 0.012, 0.09);
+  float ink = clamp(0.03 / uScale, 0.006, 0.04);
   vec3 col = uColor;
-  if (r > outer - ink || r < inner + ink) col = uInk;
+  if (r > outer - ink || r < inner + ink) col = mix(uInk, uColor * 0.4, 0.6);
   else if (r < mix(inner, outer, 0.45)) col *= 0.78;   // inner shade band
   gl_FragColor = vec4(col, 1.0);
 }`;
@@ -170,8 +174,8 @@ function burstTexture() {
     g.closePath();
   };
   g.lineJoin = 'miter';
-  star(52, 122, 11, 0.25); g.fillStyle = '#14121c'; g.fill();          // ink
-  star(44, 110, 11, 0.25); g.fillStyle = '#ffffff'; g.fill();          // tint layer (sprite colour)
+  star(48, 116, 11, 0.25); g.fillStyle = '#5a4a3a'; g.fill();          // thin edge (darkened by the tint)
+  star(45, 112, 11, 0.25); g.fillStyle = '#ffffff'; g.fill();          // tint layer (sprite colour)
   star(26, 62, 9, 0.2); g.fillStyle = '#ffffff'; g.fill();
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;

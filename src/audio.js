@@ -8,8 +8,8 @@ const rnd = (a, b) => a + Math.random() * (b - a);
 // loudness trims per event (balanced from offline renders: hits up front,
 // channels like the telekinesis hum and the flame roar sit underneath)
 const VOL = {
-  click: 1.5, coin: 1.4, punch: 1.6, kill: 1.15, hurt: 1.3, whoosh: 2.4, teleport: 1.3, flame: 0.7, freeze: 1.1,
-  shatter: 1.1, tk: 0.55, slam: 1.0, invis: 1.4, xray: 1.3, morph: 1.2, dupe: 1.0, pickup: 1.1, potion: 1.0,
+  click: 1.5, coin: 1.4, punch: 0.6, kill: 0.55, hurt: 1.0, whoosh: 1.1, teleport: 1.3, flame: 0.7, freeze: 1.1,
+  shatter: 0.8, tk: 0.55, slam: 0.75, invis: 1.4, xray: 1.3, morph: 1.2, dupe: 1.0, pickup: 1.1, potion: 1.0,
   fireball: 1.6, explosion: 1.0, landing: 0.95, grow: 0.8, nemesis: 0.8, death: 0.8, worldshift: 1.2, cashout: 0.8,
 };
 
@@ -20,6 +20,7 @@ class AudioEngine {
     this.noiseBuf = null;
     this.last = {};
     this._k = 1;
+    this._dk = 1;
     for (const [name, k] of Object.entries(VOL)) {
       const fn = this[name];
       this[name] = (...args) => { this._k = k; try { fn.apply(this, args); } finally { this._k = 1; } };
@@ -74,6 +75,13 @@ class AudioEngine {
     this.wet.connect(conv).connect(wetOut).connect(this.master);
   }
 
+  // play an event quieter (k < 1), e.g. scaled by distance from the camera
+  play(name, k = 1) {
+    if (!this.on || k <= 0.02) return;
+    this._dk = k;
+    try { this[name](); } finally { this._dk = 1; }
+  }
+
   setEnabled(on) {
     this.enabled = on;
     try { localStorage.setItem('irr_sound', on ? '1' : '0'); } catch { /* private mode */ }
@@ -94,7 +102,7 @@ class AudioEngine {
   // ---------------------------------------------------------------------------
   // output stage for one voice: envelope gain -> dry (+ reverb send, + pan)
   out(t, { a = 0.005, peak = 0.3, hold = 0, d = 0.2, send = 0.1, pan = 0 }) {
-    peak *= this._k;
+    peak *= this._k * this._dk;
     const g = this.ctx.createGain();
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(Math.max(peak, 0.0002), t + a);
@@ -225,18 +233,15 @@ class AudioEngine {
     this.bell(2093 * k, t + 0.07, 0.11, 0.38, 2, 0.15);
   }
   punch() {
-    if (!this.on || !this.gate('punch', 0.035)) return; const t = this.t, k = rnd(0.88, 1.12);
-    this.thump(t, 0.55, 92 * k);
-    this.noise({ t, dur: 0.06, peak: 0.42, f: 1500 * k, f2: 700, q: 1.3, send: 0.08 });          // crack
-    this.osc({ t, type: 'sawtooth', f: 420 * k, f2: 110, dur: 0.075, peak: 0.16, lp: 2200, lp2: 400, send: 0.06 }); // whap
+    if (!this.on || !this.gate('punch', 0.09)) return; const t = this.t, k = rnd(0.88, 1.12);
+    this.osc({ t, type: 'sine', f: 190 * k, f2: 70 * k, dur: 0.11, a: 0.003, peak: 0.45, send: 0.04 });   // soft body thud
+    this.noise({ t, dur: 0.05, peak: 0.16, type: 'lowpass', f: 1600 * k, f2: 500, q: 0.7, send: 0.04 }); // padded slap
   }
   kill() {
-    if (!this.on || !this.gate('kill', 0.05)) return; const t = this.t, k = rnd(0.9, 1.1);
-    this.thump(t, 0.6, 78 * k);
-    this.noise({ t, dur: 0.22, peak: 0.35, f: 1100 * k, f2: 180, q: 0.9, send: 0.12 });
-    this.timp(104 * k, t, 0.32, 0.6);
-    this.crash(t + 0.01, 0.1, 0.6);
-    this.osc({ t: t + 0.02, type: 'square', f: 880 * k, f2: 160, dur: 0.16, peak: 0.06, lp: 2600, send: 0.15 });    // ricochet "pyew"
+    if (!this.on || !this.gate('kill', 0.12)) return; const t = this.t, k = rnd(0.9, 1.1);
+    this.osc({ t, type: 'sine', f: 170 * k, f2: 60 * k, dur: 0.16, a: 0.003, peak: 0.45, send: 0.06 });
+    this.timp(104 * k, t, 0.3, 0.5);
+    this.osc({ t: t + 0.03, type: 'triangle', f: 1100 * k, f2: 260, dur: 0.16, peak: 0.07, send: 0.2 });   // ricochet "pyew"
   }
   hurt() {
     if (!this.on || !this.gate('hurt', 0.08)) return; const t = this.t;
@@ -244,7 +249,7 @@ class AudioEngine {
     this.osc({ t, type: 'square', f: 330, f2: 150, dur: 0.24, peak: 0.12, lp: 1400, vib: [22, 25], send: 0.12 });       // "bwonk"
   }
   whoosh() {
-    if (!this.on || !this.gate('whoosh', 0.06)) return; const t = this.t, dur = rnd(0.22, 0.32), lo = rnd(280, 420), hi = rnd(1900, 3000);
+    if (!this.on || !this.gate('whoosh', 0.11)) return; const t = this.t, dur = rnd(0.22, 0.32), lo = rnd(280, 420), hi = rnd(1900, 3000);
     this.noise({ t, dur, a: dur * 0.45, peak: 0.28, d: dur * 0.55, fcurve: [lo, hi, hi * 0.9, lo * 1.5], q: 1.8, send: 0.1, pan: rnd(-0.4, 0.4) });
   }
   teleport() {

@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b0e14">
+  <meta name="description" content="Every character, building, prop, effect, icon and animation in Irremarkables, rendered from the game's own code, with sizes, palettes and source links.">
+  <title>Irremarkables Asset Catalog</title>
+  <link rel="icon" href="../icons/icon-192.png">
+  <link rel="stylesheet" href="./font.css">
+  <link rel="stylesheet" href="./catalog.css">
+</head>
+<body>
+  <header class="top">
+    <div class="top-row">
+      <a class="back" href="../">&larr; Play the game</a>
+      <span class="stamp" id="stamp"></span>
+    </div>
+    <h1><span class="t1">IRRE</span><span class="t2">MARKABLES</span> <span class="t3">Asset Catalog</span></h1>
+    <p class="lede">Every hero, building, prop, effect, icon and animation in the game, rendered by the game's own code in a neutral studio. Open any asset for its views, measurements, palette, variation rules and source.</p>
+  </header>
+
+  <div class="bar" id="bar">
+    <div class="search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21"/></svg>
+      <input id="q" type="search" placeholder="Search assets, tags, colours, clips…" autocomplete="off" spellcheck="false" aria-label="Search assets">
+      <kbd class="hint" aria-hidden="true">/</kbd>
+    </div>
+    <div class="controls">
+      <label class="sel">
+        <span>Sort</span>
+        <select id="sort" aria-label="Sort by">
+          <option value="category">Category</option>
+          <option value="name">Name A–Z</option>
+          <option value="-name">Name Z–A</option>
+          <option value="-size">Largest first</option>
+          <option value="size">Smallest first</option>
+          <option value="-height">Tallest first</option>
+          <option value="-tris">Most triangles</option>
+          <option value="tris">Fewest triangles</option>
+          <option value="-duration">Longest clip</option>
+          <option value="-views">Most views</option>
+        </select>
+      </label>
+      <div class="seg" role="group" aria-label="Layout">
+        <button id="v-grid" class="on" aria-pressed="true" title="Grid">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+          <span>Grid</span>
+        </button>
+        <button id="v-table" aria-pressed="false" title="Table">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18M3 12h18M3 19h18"/></svg>
+          <span>Table</span>
+        </button>
+      </div>
+      <button id="csv" class="ghost" title="Download the filtered list as CSV">CSV</button>
+    </div>
+  </div>
+
+  <nav class="chips" id="chips" aria-label="Categories"></nav>
+  <p class="catblurb" id="catblurb"></p>
+
+  <main>
+    <p class="count" id="count" aria-live="polite"></p>
+    <div id="grid" class="grid"></div>
+    <div id="table-wrap" class="table-wrap" hidden>
+      <table id="table">
+        <thead><tr>
+          <th class="th-img"><span class="sr">Image</span></th>
+          <th data-sort="name">Name</th>
+          <th data-sort="category">Category</th>
+          <th data-sort="size" class="num">Size (W × H × D m)</th>
+          <th data-sort="tris" class="num">Triangles</th>
+          <th data-sort="duration" class="num">Clip</th>
+          <th data-sort="views" class="num">Views</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div id="empty" class="empty" hidden>
+      <p class="pow">NOTHING!</p>
+      <p>No assets match. Try fewer words or another category.</p>
+      <button id="reset" class="ghost">Clear search and filters</button>
+    </div>
+  </main>
+
+  <footer class="foot">
+    <p>Regenerate with <code>npm run catalog</code> after changing any asset. Renders use the game's lighting plus a soft camera fill; colours are sRGB.</p>
+  </footer>
+
+  <dialog id="detail" aria-labelledby="d-name">
+    <div class="d-head">
+      <div>
+        <p class="d-kicker" id="d-kicker"></p>
+        <h2 id="d-name"></h2>
+      </div>
+      <div class="d-nav">
+        <button id="d-prev" class="icon" aria-label="Previous asset" title="Previous (←)">&#8249;</button>
+        <button id="d-next" class="icon" aria-label="Next asset" title="Next (→)">&#8250;</button>
+        <button id="d-close" class="icon" aria-label="Close" title="Close (Esc)">&times;</button>
+      </div>
+    </div>
+    <div class="d-body">
+      <section class="d-media">
+        <div class="stage" id="d-stage"><img id="d-img" alt=""></div>
+        <div class="tabs" id="d-tabs" role="tablist" aria-label="Views"></div>
+        <div class="dl" id="d-dl"></div>
+      </section>
+      <section class="d-info" id="d-info"></section>
+    </div>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="./catalog.js" defer></script>
+</body>
+</html>

@@ -177,6 +177,36 @@ export class Game {
     SFX.play(name, k * k * 0.8);
   }
 
+  // subtle footsteps: one step per stride of ground travel, for you at full
+  // (quiet) volume and for anyone else within earshot, fading with distance
+  updateFootsteps(dt) {
+    if (!dt) return;
+    this._steps = this._steps || new WeakMap();
+    const chars = [this.player?.ch, ...this.bots.map((b) => b.ch), ...(this.clones || []).map((c) => c.ch)];
+    let budget = 3; // cap how many other characters can step in one frame
+    for (const ch of chars) {
+      if (!ch) continue;
+      let st = this._steps.get(ch);
+      if (!st) { st = { x: ch.pos.x, z: ch.pos.z, acc: 0, side: 1 }; this._steps.set(ch, st); continue; }
+      const d = Math.hypot(ch.pos.x - st.x, ch.pos.z - st.z);
+      st.x = ch.pos.x; st.z = ch.pos.z;
+      const grounded = ch.alive && ch.altitude < 0.15 && !ch.propMesh && !ch.flying && !ch.frozen;
+      if (!grounded || d > 3 || d / dt < 0.8) { st.acc = Math.min(st.acc, 0.4); continue; }
+      const mine = ch === this.player?.ch;
+      const scale = ch.curScale || 1;
+      st.acc += d;
+      const stride = (d / dt > 7 ? 1.5 : 1.0) * scale;
+      if (st.acc < stride) continue;
+      st.acc -= stride; st.side = -st.side;
+      if (mine) { SFX.step(st.side, scale > 1.5, true); continue; }
+      if (budget <= 0) continue;
+      const dc = Math.hypot(ch.pos.x - this.camPos.x, ch.pos.z - this.camPos.z);
+      if (dc > 18) continue;
+      budget--;
+      SFX.play('step', (1 - dc / 18) * 0.6, st.side, scale > 1.5, false);
+    }
+  }
+
   // ---- shared comic VFX recipes (fx.js draws them) ----
   // a cel-shaded cloud poof: puffs that swell and pop, plus a couple of sparks
   poof(x, y, z, c1, c2, n = 10) {
@@ -1731,6 +1761,7 @@ export class Game {
       this.updatePlayer(dt, input);
       this.updateTelekinesis(dt);
       this.updateClones(dt);
+      this.updateFootsteps(dt);
 
       // the director decides when your story ends
       const ev = this.director.update(dt);

@@ -7,6 +7,7 @@ const rnd = (a, b) => a + Math.random() * (b - a);
 
 // loudness trims per event (balanced from offline renders: hits up front,
 // channels like the telekinesis hum and the flame roar sit underneath)
+const MUSIC_VOL = 0.3; // background track level under the effects
 const VOL = {
   click: 1.5, coin: 1.4, punch: 0.6, kill: 0.55, hurt: 1.0, whoosh: 1.1, teleport: 1.3, flame: 0.7, freeze: 1.1,
   shatter: 0.8, tk: 0.55, slam: 0.75, invis: 1.4, xray: 1.3, morph: 1.2, dupe: 1.0, pickup: 1.1, potion: 1.0,
@@ -28,8 +29,72 @@ class AudioEngine {
   }
 
   unlock() {
-    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); this.startMusic(); return; }
     try { this.attach(new (window.AudioContext || window.webkitAudioContext)()); } catch { /* no audio available */ }
+    this.startMusic();
+  }
+
+  // ---------------------------------------------------------------------------
+  // background music: one looping track, loaded after the models, started on
+  // the first tap (browsers block audio before a gesture) and kept well under
+  // the effects. Shipped as music.json (MP3 inside) so .json-only hosts work;
+  // a host that serves .mp3 can point the json at a sibling file instead.
+  // ---------------------------------------------------------------------------
+  async loadMusic(url) {
+    try {
+      const r = await fetch(url);
+      if (!r.ok) return;
+      const j = await r.json();
+      let bytes;
+      if (j.uri.startsWith('data:')) {
+        const bin = atob(j.uri.slice(j.uri.indexOf(',') + 1));
+        bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      } else {
+        bytes = new Uint8Array(await (await fetch(new URL(j.uri, new URL(url, location.href)))).arrayBuffer());
+      }
+      this.musicBytes = bytes.buffer;
+      this.musicLoop = [j.loopStart ?? null, j.loopEnd ?? null];  // seconds: the intro plays once, then this section repeats
+      this.startMusic();
+    } catch (e) { console.warn('music unavailable', e); }
+  }
+
+  async startMusic() {
+    if (!this.ctx || !this.enabled || this.musicSrc || this._musicBusy) return;
+    if (!this.musicBuf && !this.musicBytes) return;
+    this._musicBusy = true;
+    try {
+      if (!this.musicBuf) this.musicBuf = await this.ctx.decodeAudioData(this.musicBytes.slice(0));
+      if (!this.enabled || this.musicSrc) return;
+      const b = this.musicBuf, d = b.getChannelData(0);
+      // skip MP3 encoder delay / padding so the loop point is seamless
+      let s0 = 0, s1 = d.length - 1;
+      while (s0 < 6000 && Math.abs(d[s0]) < 1e-4) s0++;
+      while (s1 > d.length - 6000 && Math.abs(d[s1]) < 1e-4) s1--;
+      const src = this.ctx.createBufferSource();
+      src.buffer = b; src.loop = true;
+      const off = s0 / b.sampleRate, [ls, le] = this.musicLoop || [];
+      src.loopStart = ls != null ? off + ls : off;
+      src.loopEnd = le != null ? Math.min(off + le, (s1 + 1) / b.sampleRate) : (s1 + 1) / b.sampleRate;
+      const g = this.ctx.createGain();
+      const now = this.ctx.currentTime;
+      g.gain.setValueAtTime(0.0001, now);
+      g.gain.exponentialRampToValueAtTime(MUSIC_VOL, now + 3);
+      src.connect(g).connect(this.master);
+      src.start(now, off);
+      this.musicSrc = src; this.musicGain = g;
+    } catch (e) { console.warn('music decode failed', e); }
+    finally { this._musicBusy = false; }
+  }
+
+  stopMusic() {
+    if (!this.musicSrc) return;
+    const src = this.musicSrc, g = this.musicGain, now = this.ctx.currentTime;
+    g.gain.cancelScheduledValues(now);
+    g.gain.setValueAtTime(Math.max(g.gain.value, 0.0001), now);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.6);
+    src.stop(now + 0.7);
+    this.musicSrc = null; this.musicGain = null;
   }
 
   // build the mix bus on a (real or offline) context
@@ -76,14 +141,15 @@ class AudioEngine {
   }
 
   // play an event quieter (k < 1), e.g. scaled by distance from the camera
-  play(name, k = 1) {
+  play(name, k = 1, ...args) {
     if (!this.on || k <= 0.02) return;
     this._dk = k;
-    try { this[name](); } finally { this._dk = 1; }
+    try { this[name](...args); } finally { this._dk = 1; }
   }
 
   setEnabled(on) {
     this.enabled = on;
+    if (this.ctx) { if (on) this.startMusic(); else this.stopMusic(); }
     try { localStorage.setItem('irr_sound', on ? '1' : '0'); } catch { /* private mode */ }
   }
 
@@ -226,6 +292,14 @@ class AudioEngine {
     if (!this.on) return; const t = this.t;
     this.osc({ t, type: 'sine', f: 1900, f2: 1500, dur: 0.045, peak: 0.12, send: 0 });
     this.noise({ t, dur: 0.02, peak: 0.07, f: 2600, q: 6, send: 0 });
+  }
+  // soft footstep: a padded heel thud and a short sole scuff, alternating
+  // feet slightly left/right. heavy = enlarged hero (deeper, a bit louder)
+  step(side = 1, heavy = false, mine = false) {
+    if (!this.on || !this.gate(mine ? 'stepP' : 'step', mine ? 0.12 : 0.07)) return;
+    const t = this.t, k = rnd(0.9, 1.12) * (heavy ? 0.6 : 1);
+    this.osc({ t, type: 'sine', f: 150 * k, f2: 70 * k, dur: 0.06, a: 0.002, peak: heavy ? 0.22 : 0.1, send: 0.02, pan: side * 0.15 });
+    this.noise({ t: t + 0.004, dur: 0.045, peak: heavy ? 0.08 : 0.06, type: 'lowpass', f: rnd(900, 1300) * k, f2: 300, q: 0.6, send: 0.02, pan: side * 0.15 });
   }
   coin() {
     if (!this.on || !this.gate('coin', 0.04)) return; const t = this.t, k = rnd(0.98, 1.03);

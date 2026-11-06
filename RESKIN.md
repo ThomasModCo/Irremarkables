@@ -119,3 +119,15 @@ Also run `python3 pipeline/strip_avif.py dist/assets`. three's GLTFLoader embeds
 - **Variation:** frequent sounds (punch, kill, whoosh, coin) vary their pitch randomly on every play and are rate-limited, so a brawl doesn't turn into noise.
 - **Levels:** per-event loudness trims live in `VOL` at the top of the file.
 - **Offline rendering:** `AudioEngine.attach(ctx)` also accepts an `OfflineAudioContext`. `pipeline/sfxrender.cjs` uses it to render every sound to WAV and report its peak, RMS and length.
+
+## Footsteps and background music
+- **Footsteps** (`Game.updateFootsteps`, `SFX.step`):
+  - One soft step per stride of ground travel: about 1 m when walking and 1.5 m when sprinting, scaled by hero size. Alternate feet are panned slightly left and right.
+  - Your own steps play at full volume.
+  - Other characters are heard only within 18 m, fading with distance, and at most three per frame.
+  - There are no steps while flying, frozen or disguised.
+- **Music** (`public/music.json`, `SFX.loadMusic`): an atmospheric superhero-movie pad track with sweeping pads, a soft low-string pulse and distant horns.
+  - It was generated with ElevenLabs Music, then cut to a seamless 20-second loop. The cut points were chosen by spectral matching, then crossfaded.
+  - It loads after the models, so boot isn't held up. It starts on the first tap with a 3-second fade-in.
+  - It sits at `MUSIC_VOL` (0.3) under the effects, and the sound button mutes it along with everything else.
+  - The MP3 is embedded in the .json so .json-only hosts work. For hosts that review media, the artifact build writes it out as `music.mp3`.

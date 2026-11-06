@@ -1,3 +1,4 @@
+import { SFX } from './audio.js';
 import { POWERS } from './powers.js';
 import './font.css';
 import { loadAnimLib } from './animlib.js';
@@ -11,7 +12,7 @@ async function boot() {
   try {
     // the comic display font is drawn into canvas textures (impact words), so wait for it
     await Promise.all([
-      loadAnimLib('./anims.json').then(() => loadAuthored('./')),
+      loadAnimLib('./anims.json').then(() => loadAuthored('./')).then(() => { SFX.loadMusic('./music.json'); }),
       document.fonts?.load('96px Bangers').catch(() => {}),
     ]);
   } catch (e) {
@@ -23,6 +24,7 @@ async function boot() {
   const game = new Game(canvas);
   window.__game = game; // console/testing hook
   window.__powers = POWERS;
+  window.__sfx = SFX;
 
   function resize() {
     game.resize(window.innerWidth, window.innerHeight);
